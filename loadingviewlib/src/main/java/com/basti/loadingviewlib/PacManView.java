@@ -10,10 +10,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
-import android.widget.Toast;
 
 /**
  * Created by SHIBW-PC on 2016/1/14.
@@ -31,14 +29,15 @@ public class PacManView extends View {
     private float beanRadius;//bean半径
     private float space;//bean和pacman的举例
     private Status mStatus = Status.BeforeLoading;//当前状态
-    private boolean isInit = false;
+    private float alpha;
 
     private ValueAnimator degreeAnimator, beanXLoadingAnimator, pacmanXLoadingAnimator;//Loading状态时的动画
-    private ValueAnimator beanCancelAnimator, pacmanCancelAnimator;//Cancel状态时的动画
-    private ValueAnimator beanFinishAnimator;//Finish状态时的动画
+    private ValueAnimator beanCancelAnimator;//Cancel状态时的动画
+    private ValueAnimator pacmanFinishAnimator;//Finish状态时的动画
+    private ValueAnimator alphaAnimator;//消失时的alpha动画
 
     enum Status {
-        BeforeLoading,Loading, Finish, Cancel,
+        BeforeLoading, Loading, Finish, Cancel,
     }
 
     public PacManView(Context context) {
@@ -59,37 +58,108 @@ public class PacManView extends View {
 
         initLoadingAnim();
         initCancelAnim();
-        switch (mStatus){
+        initFinishAnim();
+        initAlphtAnim();
+        switch (mStatus) {
+            case BeforeLoading:
+                setVisibility(GONE);
+                break;
             case Loading:
-
-                degreeAnimator.cancel();
-                beanXLoadingAnimator.cancel();
-                pacmanXLoadingAnimator.cancel();
-
-                degreeAnimator.start();
-                beanXLoadingAnimator.start();
-                pacmanXLoadingAnimator.start();
+                showLoading();
                 break;
             case Finish:
-                Toast.makeText(getContext().getApplicationContext(),"finish",Toast.LENGTH_SHORT).show();
+                showFinish();
                 break;
             case Cancel:
-                pacmanXLoadingAnimator.cancel();
-                beanXLoadingAnimator.cancel();
-                beanCancelAnimator.setFloatValues(beanX, width);
-                beanCancelAnimator.setDuration((long) (3000 * ((float) width + 2 * pacmanRadius + space - beanX) / (width+2*beanRadius+2*pacmanRadius+space)));
-                beanCancelAnimator.start();
+                showCancel();
                 break;
         }
 
 
+    }
+
+    private void showCancel() {
+        pacmanXLoadingAnimator.cancel();
+        beanXLoadingAnimator.cancel();
+        float speed = (width + 2 * beanRadius + space + 2 * pacmanRadius) / (3000);
+        beanCancelAnimator.setFloatValues(beanX, beanX + speed * 400);
+        beanCancelAnimator.setDuration(400);
+        alphaAnimator.setDuration(400);
+        beanCancelAnimator.start();
+        alphaAnimator.start();
+    }
+
+    private void showFinish() {
+        beanXLoadingAnimator.cancel();
+        pacmanXLoadingAnimator.cancel();
+
+        pacmanFinishAnimator.setFloatValues(pacmanX, beanX);
+        pacmanFinishAnimator.setDuration((long) (3000 * (space + pacmanRadius) / (width + 2 * beanRadius + 2 * pacmanRadius + space)) * 5);
+        alphaAnimator.setDuration((long) (3000 * (space + pacmanRadius) / (width + 2 * beanRadius + 2 * pacmanRadius + space)) * 5);
+        pacmanFinishAnimator.start();
+        alphaAnimator.start();
+    }
+
+    private void showLoading() {
+        degreeAnimator.cancel();
+        beanXLoadingAnimator.cancel();
+        pacmanXLoadingAnimator.cancel();
+        setAlpha(1);
+
+        degreeAnimator.start();
+        beanXLoadingAnimator.start();
+        pacmanXLoadingAnimator.start();
+    }
+
+    private void initAlphtAnim() {
+
+        if (alphaAnimator == null) {
+            alphaAnimator = ValueAnimator.ofFloat(1, 0);
+            alphaAnimator.setRepeatCount(0);
+            alphaAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    alpha = (float) animation.getAnimatedValue();
+                    setAlpha(alpha);
+                }
+            });
+            alphaAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    setVisibility(INVISIBLE);
+                    alphaAnimator.cancel();
+                }
+            });
+        }
+
+    }
+
+    private void initFinishAnim() {
+
+        if (pacmanFinishAnimator == null) {
+            pacmanFinishAnimator = ValueAnimator.ofFloat(0, 0);
+            pacmanFinishAnimator.setRepeatCount(0);
+            pacmanFinishAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    pacmanX = (float) animation.getAnimatedValue();
+                    postInvalidate();
+                }
+            });
+            pacmanFinishAnimator.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    pacmanFinishAnimator.cancel();
+                }
+            });
+        }
 
     }
 
     private void initCancelAnim() {
         if (beanCancelAnimator == null) {
             beanCancelAnimator = ValueAnimator.ofFloat(beanX, width);
-            beanCancelAnimator.setDuration((long) (3000 * ((float) width + 2 * pacmanRadius + space - beanX) / (width+2*beanRadius+2*pacmanRadius+space)));
+            beanCancelAnimator.setDuration((long) (3000 * ((float) width + 2 * pacmanRadius + space - beanX) / (width + 2 * beanRadius + 2 * pacmanRadius + space)));
             beanCancelAnimator.setRepeatCount(0);
             beanCancelAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                 @Override
@@ -101,8 +171,8 @@ public class PacManView extends View {
             beanCancelAnimator.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    setVisibility(GONE);
                     beanCancelAnimator.cancel();
+                    degreeAnimator.cancel();
                 }
             });
             beanCancelAnimator.setInterpolator(new LinearInterpolator());
@@ -126,7 +196,6 @@ public class PacManView extends View {
 
         //bean移动动画
         if (beanXLoadingAnimator == null) {
-            Log.i("TAG","beanXLoadingAnimator");
             beanXLoadingAnimator = ValueAnimator.ofFloat(-beanRadius * 2, width + 2 * pacmanRadius + space);
             beanXLoadingAnimator.setDuration(3000);
             beanXLoadingAnimator.setRepeatCount(ValueAnimator.INFINITE);
@@ -134,7 +203,6 @@ public class PacManView extends View {
                 @Override
                 public void onAnimationUpdate(ValueAnimator animation) {
                     beanX = (float) animation.getAnimatedValue();
-                    Log.i("beanX1",beanX+"");
                     postInvalidate();
                 }
             });
@@ -166,7 +234,7 @@ public class PacManView extends View {
 
         //画bean
         //bean的x坐标
-        float x = beanX+beanRadius;
+        float x = beanX + beanRadius;
         float y = getHeight() / 2;
         canvas.drawCircle(x, y, beanRadius, beanPaint);
     }
@@ -177,12 +245,15 @@ public class PacManView extends View {
         height = measureDimension(dp2px(defaultHeight), heightMeasureSpec);
         setMeasuredDimension(width, height);
 
+
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
         pacmanRadius = height / 4;
         space = pacmanRadius / 2;
         beanRadius = pacmanRadius / 4;
-/*        Log.i("pacmanRadius1", "" + pacmanRadius);
-        Log.i("space1", "" + space);
-        Log.i("beanRadius1", "" + beanRadius);*/
 
         initAnim();
     }
@@ -193,7 +264,6 @@ public class PacManView extends View {
 
         int size = MeasureSpec.getSize(measureSpec);
         int mode = MeasureSpec.getMode(measureSpec);
-
         if (mode == MeasureSpec.EXACTLY) {
             result = size;
         } else if (mode == MeasureSpec.AT_MOST) {
@@ -231,6 +301,8 @@ public class PacManView extends View {
     }
 
     public void finishLoading() {
+        setStatus(Status.Finish);
+        initAnim();
     }
 
     public void cancelLoading() {
@@ -240,5 +312,20 @@ public class PacManView extends View {
 
     public void setStatus(Status status) {
         mStatus = status;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        cancelAllAnimator();
+    }
+
+    private void cancelAllAnimator() {
+        degreeAnimator.cancel();
+        beanXLoadingAnimator.cancel();
+        pacmanXLoadingAnimator.cancel();
+        beanCancelAnimator.cancel();
+        pacmanFinishAnimator.cancel();
+        alphaAnimator.cancel();
     }
 }

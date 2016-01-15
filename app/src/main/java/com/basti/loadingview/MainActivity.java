@@ -7,6 +7,10 @@ import android.widget.Button;
 
 import com.basti.loadingviewlib.PacManView;
 
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+
 public class MainActivity extends AppCompatActivity {
 
     private PacManView pacManView;
@@ -27,9 +31,12 @@ public class MainActivity extends AppCompatActivity {
         Bt_start.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
                 pacManView.startLoading();
-
+                try {
+                    BufferedReader bufferedReader = new BufferedReader(new FileReader("text.txt"));
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
             }
         });
 
